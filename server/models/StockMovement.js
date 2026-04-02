@@ -23,6 +23,12 @@ const stockMovementSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  sourceBatchNumber: {
+    type: String,
+  },
+  destinationBatchNumber: {
+    type: String,
+  },
 }, {
   timestamps: true,
 });

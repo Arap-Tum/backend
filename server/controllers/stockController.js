@@ -95,6 +95,60 @@ const dispatchStock = async (req, res) => {
   }
 };
 
+const transferStock = async (req, res) => {
+  const { sku, sourceBatchNumber, destinationBatchNumber, quantity } = req.body;
+  const userId = req.user.id;
+
+  try {
+    const inventory = await Inventory.findOne({ sku });
+    if (!inventory) {
+      return res.status(404).json({ message: 'Inventory item not found' });
+    }
+
+    const sourceBatch = inventory.batches.find(batch => batch.batchNumber === sourceBatchNumber);
+    if (!sourceBatch) {
+      return res.status(404).json({ message: 'Source batch not found' });
+    }
+
+    if (sourceBatch.quantity < quantity) {
+      return res.status(400).json({ message: 'Insufficient source batch quantity' });
+    }
+
+    let destinationBatch = inventory.batches.find(batch => batch.batchNumber === destinationBatchNumber);
+    if (!destinationBatch) {
+      destinationBatch = {
+        batchNumber: destinationBatchNumber,
+        quantity: 0,
+        manufactureDate: sourceBatch.manufactureDate,
+        expiryDate: sourceBatch.expiryDate,
+        storageLocationCode: sourceBatch.storageLocationCode,
+      };
+      inventory.batches.push(destinationBatch);
+    }
+
+    sourceBatch.quantity -= quantity;
+    destinationBatch.quantity += quantity;
+
+    await inventory.save();
+
+    const movement = new StockMovement({
+      sku,
+      movementType: 'TRANSFER',
+      quantity,
+      user: userId,
+      batchNumber: sourceBatchNumber,
+      sourceBatchNumber,
+      destinationBatchNumber,
+    });
+    await movement.save();
+
+    res.json({ message: 'Stock transferred successfully', sourceBatch, destinationBatch });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+};
+
 const getStockHistory = async (req, res) => {
   try {
     const movements = await StockMovement.find().populate('user', 'name email');
@@ -105,4 +159,4 @@ const getStockHistory = async (req, res) => {
   }
 };
 
-module.exports = { receiveStock, dispatchStock, getStockHistory };
+module.exports = { receiveStock, dispatchStock, transferStock, getStockHistory };
