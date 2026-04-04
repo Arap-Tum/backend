@@ -2,7 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { receiveStock, dispatchStock, transferStock, getStockHistory } = require('../controllers/stockController');
 const auth = require('../middleware/auth');
-const roleCheck = require('../middleware/roleCheck');
+const { canManageInventory } = require('../middleware/roleCheck');
 
 const router = express.Router();
 
@@ -17,7 +17,7 @@ const validateRequest = (req, res, next) => {
 router.post(
   '/receive',
   auth,
-  roleCheck(['Warehouse Clerk']),
+  canManageInventory,
   [
     body('sku').trim().notEmpty().withMessage('SKU is required'),
     body('batchNumber').trim().notEmpty().withMessage('Batch number is required'),
@@ -33,7 +33,7 @@ router.post(
 router.post(
   '/dispatch',
   auth,
-  roleCheck(['Warehouse Clerk']),
+  canManageInventory,
   [
     body('sku').trim().notEmpty().withMessage('SKU is required'),
     body('quantity').isInt({ gt: 0 }).withMessage('Quantity must be a positive integer'),
@@ -45,7 +45,7 @@ router.post(
 router.post(
   '/transfer',
   auth,
-  roleCheck(['Warehouse Clerk']),
+  canManageInventory,
   [
     body('sku').trim().notEmpty().withMessage('SKU is required'),
     body('sourceBatchNumber').trim().notEmpty().withMessage('Source batch number is required'),

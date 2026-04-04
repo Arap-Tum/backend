@@ -18,6 +18,17 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/stock', require('./routes/stock'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/orders', require('./routes/orders'));
+app.use('/api/picking', require('./routes/picking'));
+app.use('/api/packing', require('./routes/packing'));
+app.use('/api/dispatch', require('./routes/dispatch'));
+app.use('/api/receiving', require('./routes/receiving'));
+app.use('/api/audit', require('./routes/audit'));
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'Server is running', timestamp: new Date() });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

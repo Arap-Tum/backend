@@ -2,7 +2,7 @@ const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const { getInventory, getInventoryBySku, createInventory, updateInventory, deleteInventory } = require('../controllers/inventoryController');
 const auth = require('../middleware/auth');
-const roleCheck = require('../middleware/roleCheck');
+const { roleCheck, canManageInventory } = require('../middleware/roleCheck');
 
 const router = express.Router();
 
@@ -19,7 +19,7 @@ router.get('/:sku', auth, param('sku').notEmpty().withMessage('SKU is required')
 router.post(
   '/',
   auth,
-  roleCheck(['Admin']),
+  roleCheck(['Warehouse Manager']),
   [
     body('sku').trim().notEmpty().withMessage('SKU is required'),
     body('productName').trim().notEmpty().withMessage('Product name is required'),
@@ -38,7 +38,7 @@ router.post(
 router.patch(
   '/:sku',
   auth,
-  roleCheck(['Admin', 'Warehouse Clerk']),
+  canManageInventory,
   [
     param('sku').notEmpty().withMessage('SKU is required'),
     body('reorderLevel').optional().isInt({ min: 0 }).withMessage('Reorder level must be >= 0'),
@@ -47,6 +47,6 @@ router.patch(
   validateRequest,
   updateInventory
 );
-router.delete('/:sku', auth, roleCheck(['Admin']), param('sku').notEmpty().withMessage('SKU is required'), validateRequest, deleteInventory);
+router.delete('/:sku', auth, roleCheck(['Warehouse Manager']), param('sku').notEmpty().withMessage('SKU is required'), validateRequest, deleteInventory);
 
 module.exports = router;

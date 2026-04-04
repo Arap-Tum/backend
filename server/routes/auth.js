@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { register, login } = require('../controllers/authController');
+const { register, login, getProfile, logout } = require('../controllers/authController');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -12,18 +13,29 @@ const validateRequest = (req, res, next) => {
   next();
 };
 
+// Register new user
 router.post(
   '/register',
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-    body('role').isIn(['Admin', 'Warehouse Clerk']).withMessage('Role must be Admin or Warehouse Clerk'),
+    body('role').isIn([
+      'Warehouse Manager',
+      'Inventory Manager',
+      'Picker',
+      'Packer',
+      'Dispatch Officer',
+      'Receiving Officer',
+      'Sales Staff'
+    ]).withMessage('Invalid role'),
+    body('department').isIn(['Warehouse', 'Sales', 'Logistics']).withMessage('Invalid department'),
   ],
   validateRequest,
   register
 );
 
+// Login user
 router.post(
   '/login',
   [
@@ -33,5 +45,11 @@ router.post(
   validateRequest,
   login
 );
+
+// Get current user profile
+router.get('/profile', auth, getProfile);
+
+// Logout
+router.post('/logout', auth, logout);
 
 module.exports = router;
