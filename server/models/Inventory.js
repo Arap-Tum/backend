@@ -36,7 +36,7 @@ const inventorySchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    required: true,
+    required: false,
   },
   reorderLevel: {
     type: Number,

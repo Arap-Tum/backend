@@ -1,7 +1,7 @@
 const Receiving = require('../models/Receiving');
 const Inventory = require('../models/Inventory');
 const StockMovement = require('../models/StockMovement');
-
+const mongoose = require("mongoose")
 // Create receiving document
 const createReceiving = async (req, res) => {
   try {
@@ -77,7 +77,7 @@ const getReceivingById = async (req, res) => {
 // Update received goods quantities
 const updateReceivedQuantities = async (req, res) => {
   try {
-    const  items  = req.body;
+  const { items } = req.body;
 
      const receivingId = req.params.id;
 
@@ -108,7 +108,8 @@ const updateReceivedQuantities = async (req, res) => {
       receiving,
     });
   } catch (err) {
-    console.error(err.message);
+    console.error("this is the error  Meassage: ", err.message);
+    console.log("This is the entire error ", err)
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -230,6 +231,8 @@ const acceptReceiving = async (req, res) => {
     session.endSession();
 
     console.error(err.message);
+
+    console.log("The entire erro: ", err)
     res.status(500).json({ message: err.message });
   }
 };
