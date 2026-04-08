@@ -77,7 +77,9 @@ const getReceivingById = async (req, res) => {
 // Update received goods quantities
 const updateReceivedQuantities = async (req, res) => {
   try {
-    const { receivingId, items } = req.body;
+    const  items  = req.body;
+
+     const receivingId = req.params.id;
 
     if (!receivingId || !items) {
       return res.status(400).json({ message: 'Missing required fields' });
@@ -114,8 +116,9 @@ const updateReceivedQuantities = async (req, res) => {
 // Inspect received goods
 const inspectReceivedGoods = async (req, res) => {
   try {
-    const { receivingId, inspectionNotes } = req.body;
+    const inspectionNotes = req.body;
 
+     const receivingId = req.params.id;
     if (!receivingId) {
       return res.status(400).json({ message: 'Receiving ID is required' });
     }
@@ -149,89 +152,94 @@ const inspectReceivedGoods = async (req, res) => {
 };
 
 // Accept receiving and update inventory
+
 const acceptReceiving = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const { receivingId } = req.body;
+    const receivingId = req.params.id;
 
-    if (!receivingId) {
-      return res.status(400).json({ message: 'Receiving ID is required' });
-    }
+    let receiving = await Receiving.findById(receivingId).session(session);
 
-    let receiving = await Receiving.findById(receivingId);
     if (!receiving) {
-      return res.status(404).json({ message: 'Receiving document not found' });
+      throw new Error('Receiving document not found');
     }
 
     receiving.receivingStatus = 'completed';
     receiving.approvedBy = req.user.id;
     receiving.approvalDate = new Date();
 
-    // Update inventory for accepted items
     for (const item of receiving.items) {
-      if (item.status !== 'rejected') {
-        // Check if inventory exists
-        let inventory = await Inventory.findOne({ sku: item.sku });
+      if (item.status === 'rejected') continue;
 
-        if (!inventory) {
-          // Create new inventory
-          inventory = new Inventory({
-            sku: item.sku,
-            productName: item.productName || '',
-            category: '',
-            reorderLevel: 0,
-            batches: [
-              {
-                batchNumber: item.batchNumber,
-                quantity: item.receivedQuantity,
-                manufactureDate: item.manufactureDate,
-                expiryDate: item.expiryDate,
-                storageLocationCode: item.storageLocationCode,
-              },
-            ],
-          });
-        } else {
-          // Add batch to existing inventory
-          inventory.batches.push({
-            batchNumber: item.batchNumber,
-            quantity: item.receivedQuantity,
-            manufactureDate: item.manufactureDate,
-            expiryDate: item.expiryDate,
-            storageLocationCode: item.storageLocationCode,
-          });
-        }
+      let inventory = await Inventory.findOne({ sku: item.sku }).session(session);
 
-        await inventory.save();
-
-        // Record stock movement
-        const movement = new StockMovement({
+      if (!inventory) {
+        inventory = new Inventory({
           sku: item.sku,
-          movementType: 'RECEIVE',
-          quantity: item.receivedQuantity,
-          user: req.user.id,
-          batchNumber: item.batchNumber,
+          productName: item.productName || '',
+          category: '',
+          reorderLevel: 0,
+          batches: [],
         });
-        await movement.save();
-
-        item.status = 'accepted';
       }
+
+      // 🔥 IMPORTANT FIX HERE (NO DUPLICATE BATCHES)
+      const existingBatch = inventory.batches.find(
+        b => b.batchNumber === item.batchNumber
+      );
+
+      if (existingBatch) {
+        existingBatch.quantity += item.receivedQuantity;
+      } else {
+        inventory.batches.push({
+          batchNumber: item.batchNumber,
+          quantity: item.receivedQuantity,
+          manufactureDate: item.manufactureDate,
+          expiryDate: item.expiryDate,
+          storageLocationCode: item.storageLocationCode,
+        });
+      }
+
+      await inventory.save({ session });
+
+      await StockMovement.create([{
+        sku: item.sku,
+        movementType: 'RECEIVE',
+        quantity: item.receivedQuantity,
+        user: req.user.id,
+        batchNumber: item.batchNumber,
+      }], { session });
+
+      item.status = 'accepted';
     }
 
-    await receiving.save();
+    await receiving.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.json({
-      message: 'Receiving accepted and inventory updated',
+      message: 'Receiving accepted and inventory updated (atomic)',
       receiving,
     });
+
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+
     console.error(err.message);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: err.message });
   }
 };
 
 // Reject receiving
 const rejectReceiving = async (req, res) => {
   try {
-    const { receivingId, rejectionReason } = req.body;
+    const rejectionReason  = req.body;
+
+    const receivingId = req.params.id
 
     if (!receivingId) {
       return res.status(400).json({ message: 'Receiving ID is required' });
